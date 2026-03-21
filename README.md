@@ -8,6 +8,8 @@ Built on hexagonal architecture with DDD, MCP-native integration, and parallelis
 
 Part of the [SYNTHERA](https://smeyatskylabs.com) platform portfolio by Smeyatsky Labs.
 
+![LUMINA Architecture](docs/assets/architecture.jpg)
+
 ---
 
 ## Architecture
