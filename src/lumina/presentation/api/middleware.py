@@ -3,7 +3,7 @@ LUMINA API Middleware
 
 Architectural Intent:
 - Cross-cutting concerns handled before/after request processing
-- TenantMiddleware enforces multi-tenancy via X-Tenant-ID header
+- TenantMiddleware enforces multi-tenancy via JWT token (with X-Tenant-ID fallback)
 - RequestLoggingMiddleware provides structured request/response logging
 """
 
@@ -13,6 +13,7 @@ import logging
 import time
 from typing import Callable
 
+import jwt
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -21,22 +22,40 @@ logger = logging.getLogger("lumina.api")
 
 
 class TenantMiddleware(BaseHTTPMiddleware):
-    """Extract tenant_id from X-Tenant-ID header and attach to request state.
+    """Extract tenant_id from JWT token or X-Tenant-ID header and attach to request state.
 
-    Public endpoints (health check, docs) bypass tenant validation.
-    All other endpoints require a valid X-Tenant-ID header.
+    Public endpoints (health check, docs, auth endpoints) bypass tenant
+    validation.  For all other endpoints the middleware first attempts to read
+    the tenant from the JWT ``Authorization: Bearer`` token.  If no JWT is
+    present it falls back to the ``X-Tenant-ID`` header for backwards
+    compatibility.
     """
 
     EXEMPT_PATHS = frozenset({"/health", "/docs", "/openapi.json", "/redoc"})
+    EXEMPT_PREFIXES = ("/api/v1/auth/",)
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         path = request.url.path
 
+        # Skip auth for exempt exact paths
         if path in self.EXEMPT_PATHS:
             return await call_next(request)
 
-        tenant_id = request.headers.get("X-Tenant-ID")
-        if not tenant_id or not tenant_id.strip():
+        # Skip auth for exempt prefixes (auth endpoints)
+        for prefix in self.EXEMPT_PREFIXES:
+            if path.startswith(prefix):
+                return await call_next(request)
+
+        # Attempt to extract tenant_id from JWT bearer token
+        tenant_id = self._extract_tenant_from_jwt(request)
+
+        # Fall back to X-Tenant-ID header
+        if not tenant_id:
+            tenant_id_header = request.headers.get("X-Tenant-ID")
+            if tenant_id_header and tenant_id_header.strip():
+                tenant_id = tenant_id_header.strip()
+
+        if not tenant_id:
             return JSONResponse(
                 status_code=400,
                 content={
@@ -45,8 +64,23 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 },
             )
 
-        request.state.tenant_id = tenant_id.strip()
+        request.state.tenant_id = tenant_id
         return await call_next(request)
+
+    @staticmethod
+    def _extract_tenant_from_jwt(request: Request) -> str | None:
+        """Try to decode the bearer token and return the tenant_id claim."""
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return None
+        token = auth_header[7:]
+        try:
+            import os
+            secret = os.environ.get("JWT_SECRET", "lumina-dev-secret-change-me")
+            payload = jwt.decode(token, secret, algorithms=["HS256"])
+            return payload.get("tenant_id") or None
+        except Exception:
+            return None
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

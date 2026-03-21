@@ -26,6 +26,7 @@ from lumina.shared.domain.errors import (
 
 from lumina.presentation.api.middleware import RequestLoggingMiddleware, TenantMiddleware
 from lumina.presentation.api import (
+    auth_routes,
     beam_routes,
     graph_routes,
     intelligence_routes,
@@ -33,6 +34,7 @@ from lumina.presentation.api import (
     signal_routes,
 )
 from lumina.presentation.api.schemas import HealthResponse
+from lumina.infrastructure.auth.service import AuthService
 from lumina.presentation.config.dependency_injection import Container
 
 logger = logging.getLogger("lumina.api")
@@ -47,6 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     container = Container()
     app.state.container = container
+    app.state.auth_service = AuthService()
     logger.info("LUMINA API started — container initialised")
     yield
     await container.shutdown()
@@ -121,6 +124,7 @@ def create_app() -> FastAPI:
         return HealthResponse(status="healthy", version="1.0.0", service="lumina")
 
     # --- Module routers ---
+    app.include_router(auth_routes.router)
     app.include_router(pulse_routes.router)
     app.include_router(graph_routes.router)
     app.include_router(beam_routes.router)

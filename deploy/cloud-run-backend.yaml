@@ -1,0 +1,118 @@
+# =============================================================================
+# Cloud Run Service — LUMINA Backend
+# Apply: gcloud run services replace deploy/cloud-run-backend.yaml --region us-central1
+# =============================================================================
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: lumina-backend
+  labels:
+    cloud.googleapis.com/location: us-central1
+  annotations:
+    run.googleapis.com/description: "LUMINA AI Visibility Platform — Backend API"
+    run.googleapis.com/ingress: all
+    run.googleapis.com/launch-stage: GA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+        run.googleapis.com/vpc-access-connector: projects/PROJECT_ID/locations/us-central1/connectors/lumina-vpc-connector
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      containerConcurrency: 100
+      timeoutSeconds: 300
+      serviceAccountName: lumina-backend-sa@PROJECT_ID.iam.gserviceaccount.com
+      containers:
+        - image: us-central1-docker.pkg.dev/PROJECT_ID/lumina-docker/backend:latest
+          ports:
+            - containerPort: 8000
+              name: http1
+          resources:
+            limits:
+              memory: 1Gi
+              cpu: "2"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 30
+            failureThreshold: 3
+          env:
+            - name: LOG_LEVEL
+              value: info
+            - name: CORS_ORIGINS
+              value: https://lumina.example.com
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: database-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: jwt-secret
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: anthropic-api-key
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: openai-api-key
+            - name: GOOGLE_AI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: google-ai-api-key
+            - name: PERPLEXITY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: perplexity-api-key
+            - name: NEO4J_URI
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: neo4j-uri
+            - name: NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: neo4j-password
+            - name: PINECONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: pinecone-api-key
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: redis-url
+            - name: SENDGRID_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: sendgrid-api-key
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: slack-webhook-url
+  traffic:
+    - percent: 100
+      latestRevision: true

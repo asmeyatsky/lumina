@@ -10,6 +10,7 @@ build/
 venv/
 .env
 .env.*
+!.env.example
 *.db
 *.sqlite3
 .pytest_cache/
@@ -18,3 +19,19 @@ htmlcov/
 .ruff_cache/
 .mypy_cache/
 node_modules/
+
+# Terraform
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate
+deploy/terraform/*.tfstate.backup
+deploy/terraform/*.tfvars
+deploy/terraform/.terraform.lock.hcl
+
+# Docker
+*.tar
+
+# Frontend build output
+frontend/dist/
+
+# Coverage
+coverage.xml
