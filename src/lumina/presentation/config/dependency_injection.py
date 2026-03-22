@@ -37,6 +37,25 @@ from lumina.intelligence.domain.entities import (
 from lumina.intelligence.domain.ports import IntelligenceRepositoryPort, ModuleScorePort
 from lumina.intelligence.domain.value_objects import AVSWeights
 
+from lumina.orbit.application.commands import (
+    ApprovePlanCommand,
+    PauseSessionCommand,
+    ResumeSessionCommand,
+    RunCycleCommand,
+    RunFullSessionCommand,
+    StartSessionCommand,
+)
+from lumina.orbit.application.queries import (
+    GetActiveSessionQuery,
+    GetInsightsQuery,
+    GetSessionHistoryQuery,
+    GetSessionMetricsQuery,
+    GetSessionQuery,
+)
+from lumina.orbit.domain.entities import AgentSession
+from lumina.orbit.infrastructure.adapters.agent_engine import ClaudeAgentEngine
+from lumina.orbit.infrastructure.adapters.module_bridge import ModuleBridge
+
 
 # =============================================================================
 # In-Memory Adapters (default for development / testing)
@@ -108,6 +127,34 @@ class InMemoryIntelligenceRepository:
         if not records:
             return None
         return records[-1]
+
+
+class InMemoryOrbitRepository:
+    """In-memory repository for ORBIT session aggregates."""
+
+    def __init__(self) -> None:
+        self._sessions: dict[str, AgentSession] = {}
+
+    async def save_session(self, session: AgentSession) -> None:
+        self._sessions[session.id] = session
+
+    async def get_session(self, session_id: str) -> AgentSession | None:
+        return self._sessions.get(session_id)
+
+    async def get_sessions_for_brand(
+        self, brand_id: str, limit: int = 20
+    ) -> list[AgentSession]:
+        sessions = [
+            s for s in self._sessions.values() if s.brand_id == brand_id
+        ]
+        sessions.sort(key=lambda s: s.created_at, reverse=True)
+        return sessions[:limit]
+
+    async def get_active_session(self, brand_id: str) -> AgentSession | None:
+        for session in self._sessions.values():
+            if session.brand_id == brand_id and not session.is_terminal:
+                return session
+        return None
 
 
 class InMemoryModuleScores:
@@ -185,14 +232,24 @@ class Container:
             distribution_coverage=float(os.environ.get("LUMINA_WEIGHT_SIGNAL", "0.20")),
         )
 
-        # Wire adapters
+        # Wire adapters — shared
         self._event_bus = InMemoryEventBus()
+
+        # Wire adapters — Intelligence
         self._intelligence_repository = InMemoryIntelligenceRepository()
         self._module_scores = InMemoryModuleScores(
             default_pulse=float(os.environ.get("LUMINA_DEFAULT_PULSE_SCORE", "50.0")),
             default_graph=float(os.environ.get("LUMINA_DEFAULT_GRAPH_SCORE", "50.0")),
             default_beam=float(os.environ.get("LUMINA_DEFAULT_BEAM_SCORE", "50.0")),
             default_signal=float(os.environ.get("LUMINA_DEFAULT_SIGNAL_SCORE", "50.0")),
+        )
+
+        # Wire adapters — ORBIT
+        self._orbit_repository = InMemoryOrbitRepository()
+        self._module_bridge = ModuleBridge()
+        self._agent_engine = ClaudeAgentEngine(
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            model=os.environ.get("LUMINA_ORBIT_MODEL", "claude-sonnet-4-20250514"),
         )
 
     # --- Port accessors ---
@@ -208,6 +265,18 @@ class Container:
     @property
     def module_scores(self) -> InMemoryModuleScores:
         return self._module_scores
+
+    @property
+    def orbit_repository(self) -> InMemoryOrbitRepository:
+        return self._orbit_repository
+
+    @property
+    def module_bridge(self) -> ModuleBridge:
+        return self._module_bridge
+
+    @property
+    def agent_engine(self) -> ClaudeAgentEngine:
+        return self._agent_engine
 
     # --- Command factories ---
 
@@ -231,6 +300,44 @@ class Container:
             event_bus=self._event_bus,
         )
 
+    # --- ORBIT command factories ---
+
+    def start_session_command(self) -> StartSessionCommand:
+        return StartSessionCommand(
+            repository=self._orbit_repository,
+            agent_engine=self._agent_engine,
+            module_bridge=self._module_bridge,
+            event_bus=self._event_bus,
+        )
+
+    def run_cycle_command(self) -> RunCycleCommand:
+        return RunCycleCommand(
+            repository=self._orbit_repository,
+            agent_engine=self._agent_engine,
+            module_bridge=self._module_bridge,
+            event_bus=self._event_bus,
+        )
+
+    def run_full_session_command(self) -> RunFullSessionCommand:
+        return RunFullSessionCommand(
+            repository=self._orbit_repository,
+            agent_engine=self._agent_engine,
+            module_bridge=self._module_bridge,
+            event_bus=self._event_bus,
+        )
+
+    def approve_plan_command(self) -> ApprovePlanCommand:
+        return ApprovePlanCommand(
+            repository=self._orbit_repository,
+            event_bus=self._event_bus,
+        )
+
+    def pause_session_command(self) -> PauseSessionCommand:
+        return PauseSessionCommand(repository=self._orbit_repository)
+
+    def resume_session_command(self) -> ResumeSessionCommand:
+        return ResumeSessionCommand(repository=self._orbit_repository)
+
     # --- Query factories ---
 
     def get_avs_query(self) -> GetAVSQuery:
@@ -244,6 +351,23 @@ class Container:
 
     def get_root_cause_query(self) -> GetRootCauseQuery:
         return GetRootCauseQuery(repository=self._intelligence_repository)
+
+    # --- ORBIT query factories ---
+
+    def get_session_query(self) -> GetSessionQuery:
+        return GetSessionQuery(repository=self._orbit_repository)
+
+    def get_session_history_query(self) -> GetSessionHistoryQuery:
+        return GetSessionHistoryQuery(repository=self._orbit_repository)
+
+    def get_active_session_query(self) -> GetActiveSessionQuery:
+        return GetActiveSessionQuery(repository=self._orbit_repository)
+
+    def get_insights_query(self) -> GetInsightsQuery:
+        return GetInsightsQuery(repository=self._orbit_repository)
+
+    def get_session_metrics_query(self) -> GetSessionMetricsQuery:
+        return GetSessionMetricsQuery(repository=self._orbit_repository)
 
     # --- Lifecycle ---
 

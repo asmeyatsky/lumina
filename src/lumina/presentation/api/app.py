@@ -30,6 +30,7 @@ from lumina.presentation.api import (
     beam_routes,
     graph_routes,
     intelligence_routes,
+    orbit_routes,
     pulse_routes,
     signal_routes,
 )
@@ -130,5 +131,6 @@ def create_app() -> FastAPI:
     app.include_router(beam_routes.router)
     app.include_router(signal_routes.router)
     app.include_router(intelligence_routes.router)
+    app.include_router(orbit_routes.router)
 
     return app

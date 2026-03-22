@@ -15,25 +15,26 @@ Part of the [SYNTHERA](https://smeyatskylabs.com) platform portfolio by Smeyatsk
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      PRESENTATION LAYER                         │
-│   FastAPI REST API  ·  React Dashboard  ·  MCP Client Interfaces│
-├─────────────────────────────────────────────────────────────────┤
-│                      APPLICATION LAYER                          │
-│          Use Cases  ·  Commands  ·  Queries  ·  DTOs            │
-│                 DAG Orchestration (Parallel)                     │
-├──────────┬──────────┬──────────┬──────────┬─────────────────────┤
-│  PULSE   │  GRAPH   │   BEAM   │  SIGNAL  │   INTELLIGENCE      │
-│ Monitor  │ Entity   │ Content  │ Distrib  │   ENGINE            │
-│ & Cite   │ Intel    │ Optimise │ & Amplif │   AVS + Recommend   │
-├──────────┴──────────┴──────────┴──────────┴─────────────────────┤
-│                      DOMAIN LAYER                               │
-│  Entities (frozen)  ·  Value Objects  ·  Domain Events  ·  Ports│
-├─────────────────────────────────────────────────────────────────┤
-│                    INFRASTRUCTURE LAYER                          │
-│  PostgreSQL  ·  Neo4j  ·  Pinecone  ·  AI Engine Adapters       │
-│  MCP Servers  ·  Alerting  ·  CMS  ·  Integrations              │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        PRESENTATION LAYER                           │
+│   FastAPI REST API  ·  React Dashboard  ·  MCP Client Interfaces    │
+├─────────────────────────────────────────────────────────────────────┤
+│                        APPLICATION LAYER                            │
+│            Use Cases  ·  Commands  ·  Queries  ·  DTOs              │
+│                   DAG Orchestration (Parallel)                      │
+├──────────┬──────────┬──────────┬──────────┬──────────┬──────────────┤
+│  PULSE   │  GRAPH   │   BEAM   │  SIGNAL  │ INTELLI- │    ORBIT     │
+│ Monitor  │ Entity   │ Content  │ Distrib  │ GENCE    │  Autonomous  │
+│ & Cite   │ Intel    │ Optimise │ & Amplif │ AVS+Rec  │    Agent     │
+├──────────┴──────────┴──────────┴──────────┴──────────┴──────────────┤
+│                        DOMAIN LAYER                                 │
+│  Entities (frozen)  ·  Value Objects  ·  Domain Events  ·  Ports    │
+├─────────────────────────────────────────────────────────────────────┤
+│                      INFRASTRUCTURE LAYER                           │
+│  PostgreSQL  ·  Neo4j  ·  Pinecone  ·  AI Engine Adapters          │
+│  MCP Servers  ·  Alerting  ·  CMS  ·  Integrations                 │
+│  Claude Agent Engine  ·  Module Bridge                              │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### The Closed Loop
@@ -42,6 +43,9 @@ Part of the [SYNTHERA](https://smeyatskylabs.com) platform portfolio by Smeyatsk
 PULSE monitors AI outputs  →  GRAPH identifies entity gaps
 BEAM optimises content     →  SIGNAL distributes to citation surfaces
 Intelligence Engine measures improvement and recycles into PULSE
+
+ORBIT autonomously orchestrates the entire loop — planning, executing,
+and synthesising across all modules in observe-plan-act-synthesize cycles.
 ```
 
 ---
@@ -109,6 +113,20 @@ Manages GEO across a client portfolio with branded reporting.
 - At-risk client detection
 - Plan tier enforcement (Starter: 5 clients, Professional: 25, Unlimited)
 
+### ORBIT — Autonomous AI Visibility Agent
+
+Orchestrated Real-time Brand Intelligence & Transformation. A Claude-powered autonomous agent that uses all other LUMINA modules as tools to run closed-loop visibility optimisation.
+
+- **Observe-plan-act-synthesize cycles** — the agent monitors brand state, plans corrective actions, executes them across modules, and synthesises findings into actionable insights
+- **Three autonomy levels** — Supervised (approve every action), Guided (approve plan, auto-execute), Autonomous (full auto within guardrails)
+- **Guardrail system** — configurable safety constraints (max cycles, max actions, allowed/blocked modules and tools) enforced before every action
+- **Plan validation** — DAG-based execution plans with dependency resolution and circular dependency detection
+- **Claude reasoning engine** — uses the Anthropic SDK with tool-use to plan, decide, synthesise, and evaluate goal completion
+- **Module bridge** — routes agent tool calls to all 6 LUMINA modules (21 tools) through a unified interface
+- **Insight aggregation** — ranked findings by severity and confidence, grouped by source module
+- **Natural language goals** — e.g., *"Diagnose why our GPT-4o citation rate dropped 15% this week"*
+- **Session lifecycle** — start, pause, resume, approve, complete, fail — fully tracked with domain events
+
 ---
 
 ## Tech Stack
@@ -120,7 +138,7 @@ Manages GEO across a client portfolio with branded reporting.
 | Database | PostgreSQL 16 (SQLAlchemy async + Alembic), Neo4j, Pinecone |
 | Cache | Redis |
 | AI Engines | Anthropic Claude, OpenAI GPT-4o, Google Gemini, Perplexity |
-| MCP | 6 MCP servers (one per bounded context) |
+| MCP | 7 MCP servers (one per bounded context) |
 | NLP | Claude-powered citation extraction, tiktoken tokenisation, OpenAI embeddings |
 | Auth | JWT (PyJWT), OAuth 2.0, RBAC (4 roles, 6 permissions) |
 | Integrations | Slack, SendGrid, HubSpot, Salesforce, WordPress, Webflow |
@@ -157,6 +175,10 @@ lumina/
 │   │   ├── domain/          # AIVisibilityScore, Recommendation, RootCauseAnalysis
 │   │   ├── application/     # CalculateAVS, GenerateRecommendations
 │   │   └── infrastructure/  # MCP server
+│   ├── orbit/               # Autonomous Agent bounded context
+│   │   ├── domain/          # AgentSession, AgentPlan, ExecutionCycle, AgentInsight
+│   │   ├── application/     # StartSession, RunCycle, RunFullSession, ApproveAction
+│   │   └── infrastructure/  # Claude agent engine, Module bridge, MCP server
 │   ├── agency/              # Agency white-label bounded context
 │   │   ├── domain/          # Agency, ClientBrand, WhiteLabelConfig, ClientReport
 │   │   ├── application/     # OnboardClient, GenerateClientReport, BulkReports
@@ -180,7 +202,7 @@ lumina/
 │       ├── hooks/           # React Query hooks
 │       ├── pages/           # Dashboard, PULSE, GRAPH, BEAM, SIGNAL, Intelligence
 │       └── types/           # TypeScript interfaces
-├── tests/                   # 611 tests across 9 modules
+├── tests/                   # 697 tests across 10 modules
 ├── migrations/              # Alembic (21 tables, 13 enum types)
 ├── deploy/                  # Cloud Run, Terraform, Cloud Build
 └── .github/workflows/       # CI + Deploy pipelines
@@ -325,6 +347,21 @@ Base URL: `http://localhost:8000/api/v1`
 | POST | `/agency/clients/{id}/reports` | Generate report |
 | POST | `/agency/reports/bulk` | Bulk report generation |
 
+### ORBIT
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/orbit/sessions` | Start autonomous session |
+| GET | `/orbit/sessions/{id}` | Get session state |
+| POST | `/orbit/sessions/{id}/cycle` | Run one observe-plan-act-synthesize cycle |
+| POST | `/orbit/sessions/{id}/run` | Run full autonomous loop to completion |
+| POST | `/orbit/sessions/{id}/approve` | Approve agent's plan |
+| POST | `/orbit/sessions/{id}/pause` | Pause active session |
+| POST | `/orbit/sessions/{id}/resume` | Resume paused session |
+| GET | `/orbit/sessions/{id}/insights` | Get ranked insights |
+| GET | `/orbit/sessions/{id}/metrics` | Get session metrics |
+| GET | `/orbit/brands/{brand_id}/active` | Get active session for brand |
+| GET | `/orbit/brands/{brand_id}/history` | Get session history |
+
 ### Integrations
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -337,16 +374,17 @@ Base URL: `http://localhost:8000/api/v1`
 
 ## MCP Servers
 
-LUMINA exposes 6 MCP servers, one per bounded context:
+LUMINA exposes 7 MCP servers, one per bounded context:
 
 | Server | Tools | Resources |
 |--------|-------|-----------|
-| `pulse-service` | `run_monitoring`, `create_prompt_battery` | `pulse://runs/{id}`, `pulse://brands/{id}/trends` |
-| `graph-service` | `create_entity_profile`, `update_dimension`, `run_gap_analysis`, `generate_json_ld` | `graph://profiles/{id}`, `graph://gaps/{id}` |
-| `beam-service` | `score_content`, `run_rag_simulation`, `generate_rewrites`, `bulk_audit` | `beam://assets/{id}/score`, `beam://brands/{id}/audit-summary` |
-| `signal-service` | `create_distribution_plan`, `execute_action`, `generate_pr_brief`, `map_surfaces` | `signal://brands/{id}/coverage`, `signal://plans/{id}` |
-| `intelligence-service` | `calculate_avs`, `run_root_cause_analysis`, `generate_recommendations` | `intelligence://brands/{id}/avs`, `intelligence://brands/{id}/recommendations` |
-| `agency-service` | `onboard_client`, `configure_white_label`, `generate_report`, `bulk_generate_reports` | `agency://portfolio`, `agency://clients/{id}` |
+| `lumina-pulse` | `run_monitoring`, `create_prompt_battery` | `pulse://runs/{id}`, `pulse://brands/{id}/trends` |
+| `lumina-graph` | `create_entity_profile`, `update_dimension`, `run_gap_analysis`, `generate_json_ld` | `graph://profiles/{id}`, `graph://gaps/{id}` |
+| `lumina-beam` | `score_content`, `run_rag_simulation`, `generate_rewrites`, `bulk_audit` | `beam://assets/{id}/score`, `beam://brands/{id}/audit-summary` |
+| `lumina-signal` | `create_distribution_plan`, `execute_action`, `generate_pr_brief`, `map_surfaces` | `signal://brands/{id}/coverage`, `signal://plans/{id}` |
+| `lumina-intelligence` | `calculate_avs`, `run_root_cause_analysis`, `generate_recommendations` | `intelligence://brands/{id}/avs`, `intelligence://brands/{id}/recommendations` |
+| `lumina-agency` | `onboard_client`, `configure_white_label`, `generate_report`, `bulk_generate_reports` | `agency://portfolio`, `agency://clients/{id}` |
+| `lumina-orbit` | `start_session`, `run_cycle`, `run_full_session`, `approve_plan`, `pause_session`, `resume_session` | `orbit://sessions/{id}`, `orbit://sessions/{id}/insights`, `orbit://sessions/{id}/metrics` |
 
 ---
 
@@ -385,7 +423,7 @@ pytest tests/ -m "not integration"
 make test-ci
 ```
 
-**611 tests** across 9 modules — domain (pure, no mocks), application (mocked ports), infrastructure, and integration.
+**697 tests** across 10 modules — domain (pure, no mocks), application (mocked ports), infrastructure, and integration.
 
 ---
 
